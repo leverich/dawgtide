@@ -3,5 +3,5 @@ all: constituents web
 .PHONY: constituents web
 constituents:
 	make -C $@
-web:
+web: constituents
 	make -C $@
