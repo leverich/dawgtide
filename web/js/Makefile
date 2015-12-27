@@ -6,11 +6,13 @@ bower_components: bower.json
 
 .PHONY: clean
 clean:
-	rm -rf bower_components data/* *.min.js
+	rm -rf bower_components data *.min.js
 
 data/constituents.js: ../../constituents/constituents.js
+	mkdir -p data
 	cp -v "$<" "$@"
 data/stations.js: ../../constituents/stations.js
+	mkdir -p data
 	cp -v "$<" "$@"
 
 index.min.js: index.js bower_components/.timestamp */*.js
