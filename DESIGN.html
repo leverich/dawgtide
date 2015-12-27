@@ -1,0 +1,185 @@
+<!-- -*- mode: text; -*- -->
+
+**Dawgtide**
+
+Dawgtide is a complete rewrite of [Tidely](https://winds.leverich.org/tides). It is to be implemented in
+purely client-side HTML/CSS/Javascript, rather than relying on any
+server-side code or xtide.
+
+# Fitting Harmonic Constituents from Data
+
+Given timestamped data from a tide station, we can fit the components
+of a [tidal harmonic model](https://en.wikipedia.org/wiki/Theory_of_tides#Harmonic_analysis) using plain linear regression (ordinary
+least squares).
+
+The harmonic model of tides for a station $s$ at time $t$ (relative to
+some reference year $Y$) for the [37 constituents](https://en.wikipedia.org/wiki/Theory_of_tides#Tidal_constituents) used by NOAA/NOS is:
+
+$$ y(s,t,Y) = Z_s + \sum_{i=1}^{37} a_{s,i} \cdot n_{Y,i} \cdot \textrm{cos}(t \cdot \omega_i + \Phi_{Y,i} - \phi_{s,i}) $$
+
+where:
+
+* $s$ is a tide station (e.g. "San Francisco, CA", 9414290).
+* $t$ is a timestamp in seconds since Jan 1 $Y$ 00:00 UTC.
+* $Y$ is the year of the prediction.
+* $Z_s$ is the mean tide value for station $s$ (e.g. mean sea level relative to some "[datum](https://tidesandcurrents.noaa.gov/datum_options.html)", or average current).
+* $a_{s,i}$ is the amplitude for coefficient $i$, station $s$. Typically reported in feet for tide height, knots for tidal current.
+* $n_{Y,i}$ is the "node factor" for coefficient $i$ for year $Y$ (based on the [Moon's nodal period](https://en.wikipedia.org/wiki/Lunar_node) of ~18.61 years). Unitless. This is computed using [tide_fac.f](https://gist.github.com/leverich/e0834df944d457962a4e), which follows the methodology of [Schureman](http://docs.lib.noaa.gov/rescue/cgs_specpubs/QB275U35no981940.pdf).
+* $\omega_i$ is the speed for coefficient $i$ (radians per second). Often reported in degrees per hour.
+* $\Phi_{Y,i}$ is the "equilibrium" phase "$V_0 + U$" for coefficient $i$, year $Y$ (radians). Often reported in degrees. This is computed using [tide_fac.f](https://gist.github.com/leverich/e0834df944d457962a4e), which follows the methodology of [Schureman](http://docs.lib.noaa.gov/rescue/cgs_specpubs/QB275U35no981940.pdf).
+* $\phi_{s,i}$ is the phase for coefficient $i$, station $s$ (radians). Often reported in degrees.
+
+Note that this model is complicated by the presence of the "lookup
+tables" $n$ and $\Phi$. This is a peculiar artifact of
+[Schureman's](http://docs.lib.noaa.gov/rescue/cgs_specpubs/QB275U35no981940.pdf)
+methodology, for which he provided exhaustive tables of constants in
+various appendices.
+It's particularly annoying that all of the phases are effectively
+referenced from Jan 1 of a specific year, rather than a fixed point in
+the past (e.g. the UNIX epoch, Jan 1 1970 00:00 UTC).
+Be especially careful when algebraically manipulating this model to
+keep track of the reference time used for timestamps and phases.
+
+## Estimating $a$ and $\phi$
+
+To fit parameters to the harmonic model given above, we only need to
+solve for $a_{s,i}$ and
+$\phi_{s,i}$ for
+$i=1 \ldots 37$ (the 37
+constituents reported by NOAA/NOS), as
+$n_{Y,i}$,
+$\Phi_{Y,i}$,
+$\omega_i$, and $t$ are all known parameters.
+However, because of the unknown parameter within the $\textrm{cos}$, this is not a linear system, so we can't directly solve for it
+with least squares.
+
+Instead, we solve for a $A_{s,i}$,
+$B_{s,i}$ in a model of the form:
+
+<!--$$ y(s,t_u) = Z_s + \sum_{i=1}^{37} \left(A_{s,i} \cdot \textrm{sin}(t_u \cdot \omega_i) + B_{s,i} \cdot \textrm{cos}(t_u \cdot \omega_i)\right) $$-->
+<!--$$ y(s,t,Y) = Z_s + \sum_{i=1}^{37} \left(A_{s,i} \cdot \textrm{sin}(t \cdot \omega_i) + B_{s,i} \cdot \textrm{cos}(t \cdot \omega_i)\right) $$-->
+$$ y(s,t,Y) = Z_s + \sum_{i=1}^{37} \left(A_{s,i} \cdot n_{Y,i} \cdot \textrm{sin}(t \cdot \omega_i + \Phi_{Y,i}) + B_{s,i} \cdot n_{Y,i} \cdot \textrm{cos}(t \cdot \omega_i + \Phi_{Y,i})\right) $$
+
+<!--where $t_u$ is seconds since Jan 1 1970 00:00 UTC (unix
+timestamp). -->
+Note that the terms other than $A_{s,i}$ and
+$B_{s,i}$ are known and constant,
+<!--cos and sin terms are known and constant
+with respect to $A_{s,i}$ and
+$B_{s,i}$,-->
+so this is trivially optimized
+with a least squares solver.
+
+Then, using the trigonometric identity:
+
+<!--$$ A_{s,i} \cdot \textrm{sin}(t_u \cdot \omega_i) + B_{s,i} \cdot \textrm{cos}(t_u \cdot \omega_i) = \sqrt{A_{s,i}^2+B_{s,i}^2} \cdot \textrm{cos}\left(t_u \cdot \omega_i + \textrm{atan2}(B_{s,i},A_{s,i}) - \frac{\pi}{2}\right)$$-->
+<!--$$ A_{s,i} \cdot \textrm{sin}(t \cdot \omega_i) + B_{s,i} \cdot \textrm{cos}(t \cdot \omega_i) = \sqrt{A_{s,i}^2+B_{s,i}^2} \cdot \textrm{cos}\left(t \cdot \omega_i + \textrm{atan2}(B_{s,i},A_{s,i}) - \frac{\pi}{2}\right)$$-->
+<!--$$ A_{s,i} \cdot n_{Y,i} \cdot \textrm{sin}(t \cdot \omega_i + \Phi_{Y,i}) + B_{s,i} \cdot n_{Y,i} \cdot \textrm{cos}(t \cdot \omega_i + \Phi_{Y,i}) $$
+$$ = \sqrt{A_{s,i}^2+B_{s,i}^2} \cdot n_{Y,i} \cdot \textrm{cos}\left(t \cdot \omega_i + \Phi_{Y,i} + \textrm{atan2}(B_{s,i},A_{s,i}) - \frac{\pi}{2}\right)$$-->
+$$ A \cdot \textrm{sin}(\theta) + B \cdot \textrm{cos}(\theta) = \sqrt{A^2+B^2} \cdot \textrm{cos}\left(\theta + \textrm{atan2}(B_{s,i},A_{s,i}) - \frac{\pi}{2}\right)$$
+
+we solve for $a_{s,i}$ and
+$\phi_{s,i}$ algebraically as:
+
+<!--$$ a_{s,i} = \frac{\sqrt{A_{s,i}^2 + B_{s,i}^2}}{n_{Y,i}} $$-->
+$$ a_{s,i} = \sqrt{A_{s,i}^2 + B_{s,i}^2} $$
+
+<!--$$ \phi_{s,i} = -\omega_i \cdot t_Y - \textrm{atan2}(B_{s,i},A_{s,i}) + \frac{\pi}{2} + \Phi_{Y,i} $$-->
+<!--$$ \phi_{s,i} = -\textrm{atan2}(B_{s,i},A_{s,i}) + \frac{\pi}{2} + \Phi_{Y,i} $$-->
+$$ \phi_{s,i} = -\textrm{atan2}(B_{s,i},A_{s,i}) + \frac{\pi}{2} $$
+
+<!--where $t_Y$ is the number of seconds between Jan 1 1970 00:00 UTC and Jan 1 $Y$ 00:00 UTC.-->
+
+# Component Overview
+
+## Tidal Constituent DB
+
+Computed via [tide_fac.f](https://gist.github.com/leverich/e0834df944d457962a4e).
+
+## Tide Predictor
+### Prediction for a given point in time
+
+```
+def predict(constituents, station, reference_year, ts):
+    reference_ts = arrow.get(reference_year,1,1).timestamp
+    ts = ts - reference_ts
+    p = station['datum']
+    for name, constituent in station['constituents'].items():
+        speed = constituent['speed'] # constituents[name]['speed']
+        node_factor = constituents[name]['node_factor'][reference_year]
+        equilibrium = constituents[name]['equilibrium'][reference_year]
+        amplitude = constituent['amplitude']
+        phase = constituent['phase']
+        p += amplitude * node_factor * math.cos(ts * deg2rad(speed)/3600. - deg2rad(phase) + deg2rad(equilibrium))
+    return p
+```
+
+  - Minutely time-series given start and stop time
+  - Spans above/below threshold given start and stop time
+
+## Tidebox View
+
+**********************************************************************
+*      .-------------------.      .-------------------.              *
+*     |                     |    |                     |             *
+*     |   |    |     +      |    |   +---.      +      |             *
+*     |   |    |    / \     |    |   |    |    / \     |             *
+*     |   +----+   +---+    |    |   +---'    +---+    |             *
+*     |   |    |  /     \   |    |   |       /     \   |             *
+*     |   |    | /       \  |    |   |      /       \  |             *
+*     | 2pm             6pm |    | 2pm             6pm |             *
+*     |  .---------------.  |    |  .---------------.  |             *
+*     | |XXXXX  .    XXXXX| |    | |XXXXX  .    XXXXX| | water level *
+*     |  '---------------'  |    |  '---------------'  |             *
+*      '-------------------'     |  .---------------.  |             *
+*                                | |XXXXXXX.X        | | current     *
+*                                |  '---------------'  |             *
+*                                 '-------------------'              *
+**********************************************************************
+
+```
+<div class="box yellow">
+    <div class="tag">Ha</div>
+    <div class="bar">
+        <div class="subbar red first"
+             style="width: 34px; left: 0px;"></div>
+        <div class="subbar green"
+             style="width: 22px; left: 34px;"></div>
+        <div class="subbar red last"
+             style="width: 54px; left: 56px;"></div>
+        <div class="now" style="left: 40px;"></div>
+    </div>
+</div>
+```
+
+## Tidal Current Graph View
+## Tidal Level Graph View
+## Tide Span Agenda View
+
+- Sunrise/sunset with [suncalc.js](https://github.com/mourner/suncalc/blob/master/suncalc.js)
+
+
+<!--
+Sample data from station SFB1210_13 (Treasure Island):
+
+```
+   Date_Time (GMT), Speed (knots)
+   2014-12-29 00:00, 0.69
+   2014-12-29 00:06, 0.66
+   2014-12-29 00:12, 0.62
+   2014-12-29 00:18, 0.59
+   2014-12-29 00:24, 0.56
+   2014-12-29 00:30, 0.52
+   2014-12-29 00:36, 0.48
+            ...
+   2016-01-03 23:24, 0.89
+   2016-01-03 23:30, 0.92
+   2016-01-03 23:36, 0.95
+   2016-01-03 23:42, 0.98
+   2016-01-03 23:48, 1.00
+   2016-01-03 23:54, 1.02
+```
+-->
+
+
+<!-- Markdeep: --><style class="fallback">body{white-space:pre;font-family:monospace}</style><script src="markdeep.min.js"></script><script src="http://casual-effects.com/markdeep/latest/markdeep.min.js"></script>

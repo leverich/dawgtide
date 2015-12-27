@@ -1,0 +1,31 @@
+<html>
+  <head>
+    <title>Bay Area Tides</title>
+    <meta name="viewport" content="width=320, initial-scale=1"></meta>
+    <link rel="stylesheet" type="text/css" href="css/index.css"></link>
+
+    <script src="js/bower_components/requirejs/require.js"></script>
+    <script>
+     require.config({ baseUrl: "js" });
+     require.config({ paths: { 'index': 'index.min' } }); require(['index']);
+     // require(['config'], function() { require(['index']); });
+    </script>
+  </head>
+  <body>
+    <div class="boxes">
+      <div id="box_Ha" class="box"></div>
+      <div id="box_GG" class="box"></div>
+      <div id="box_TI" class="box"></div>
+      <div id="box_3rd" class="box"></div>
+      <div id="box_PA" class="box"></div>
+      <div id="box_Delta" class="box"></div>
+    </div>
+
+    <div id="this_day" style="text-align: center">&nbsp;</div>
+    <div class="foot">
+      <div id="yesterday" class="part"></div>
+      <div class="part"><a href="?">Today</a></div>
+      <div id="tomorrow" class="part"></div>
+    </div>
+  </body>
+</html>

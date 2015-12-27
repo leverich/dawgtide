@@ -1,0 +1,34 @@
+<html>
+  <head>
+    <title>Bay Area Tides</title>
+    <meta name="viewport" content="width=640, initial-scale=0.5"></meta>
+    <link rel="stylesheet" type="text/css" href="css/detail.css"></link>
+
+    <script src="js/bower_components/d3/d3.min.js"></script>
+    <script src="js/bower_components/vega/vega.min.js" charset="UTF-8"></script>
+    <script src="js/bower_components/requirejs/require.js"></script>
+    <script>
+     require.config({ baseUrl: "js" });
+     require.config({ paths: { 'detail': 'detail.min' } }); require(['detail']);
+     // require(['config'], function() { require(['detail']); });
+    </script>
+
+  </head>
+  <body>
+    <div id="heading" class="heading"></div>
+
+    <div id="tide_table"></div>
+    <div id="current_table"></div>
+    
+    <div id="this_day" style="text-align: center">&nbsp;</div>
+    <div class="days">
+      <div id="yesterday" class="part"></div>
+      <div id="today"     class="part"></div>
+      <div id="tomorrow"  class="part"></div>
+      <div style="margin-top: 15px"><a href="index.html">Back</a></div>
+    </div>
+    
+    <div id="tide_graph" class="graph"></div>
+    <div id="current_graph" class="graph"></div>
+  </body>
+</html>
