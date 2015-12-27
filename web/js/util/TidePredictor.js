@@ -137,7 +137,7 @@ define([
         this._predict = function(timestamp, reference) {
             var t = timestamp - reference;
 
-            // p = offset + sum(ampitude * node_factor * cos(t * speed + phase - equilibrium))
+            // p = offset + sum(ampitude * node_factor * cos(t * speed - phase + equilibrium))
             p = this.station.datum +
                 this.sum(
                     this.mul(
@@ -150,8 +150,10 @@ define([
                                     this.scale(
                                         this._c.speed,
                                         t
-                                    ), this._c.phase
-                                ), this._c.equilibrium
+                                    ),
+                                    this._c.phase
+                                ),
+                                this._c.equilibrium
                             )
                         )
                     )
