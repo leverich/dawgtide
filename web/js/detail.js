@@ -79,7 +79,7 @@ function(
     }
 
     if (current_station) {
-        new TideGraph({ el: "#current_graph", time: time, station: current_station });
+        new TideGraph({ el: "#current_graph", time: time, station: current_station, above_color: "#f00", below_color: "#2a2" });
         new TideAgenda({ el: "#current_table", time: time, station: current_station, current: true });
     }
 });
