@@ -20,7 +20,7 @@ define([
             return _.map(timestamps, function(a) { return this._predict(a, reference); }, this);
         }
 
-        // [ { time: .., state: .. }, .. ]
+        // [ { start: .., end: .., state: .. }, .. ]
         this._spans = function(records) {
             var spans = [{ state: records[0].state, start: records[0].time }];
             var current_state = records[0].state;
@@ -56,6 +56,7 @@ define([
             return spans;
         }
 
+        // [ { time: .., state: .., level: .. }, .. ]
         this.states = function(start, stop, limit) {
             var limit = limit || 0.;
 

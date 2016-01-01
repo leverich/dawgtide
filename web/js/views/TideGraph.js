@@ -42,6 +42,9 @@ define([
             var d = _.map(this.data, function(x) { return { "x": (x.time + offset)*1000, "y": x.level, "state": x.state }; });
             var limit = this.limit;
 
+            var start_mtime = (this.start_time + offset) * 1000;
+            var stop_mtime = (this.stop_time + offset) * 1000;
+
             var above_color = this.above_color;
             var below_color = this.below_color;
 
@@ -50,10 +53,28 @@ define([
                 { 'x': (this.sunset_time + offset) * 1000,  'x2': (this.stop_time + offset) * 1000, 'y': 1.0 }
             ];
 
+            // Hacky way to lookup Y-value for horizontal rule
+            var pixels_to_x = function(pix) {
+                var pleft = 30;
+                var pright = 10;
+                var width = 560;
+                return start_mtime + (stop_mtime - start_mtime) * (pix - pleft) / width;
+            };
+            var lookup_x = function(x, data) {
+                var v = _.find(data, function(d) {
+                    return d.x > x;
+                });
+                return v ? v : data[data.length - 1];
+            };
+
+            var now = (moment().unix() + offset) * 1000;
+            var now_level = (now > start_mtime && now < stop_mtime) ? lookup_x(now, d).y : undefined;
+            console.log(now, now_level);
+
             var spec = {
                 "width": 560,
                 "height": 200,
-                "padding": {"top": 10, "left": 30, "bottom": 30, "right": 10},
+                "padding": { "top": 10, "left": 30, "bottom": 30, "right": 10 },
                 "data": [
                     {
                         "name": "table",
@@ -62,36 +83,54 @@ define([
                     {
                         "name": "dark",
                         "values": darktime
-                    }
+                    },
                 ],
+
+                "signals": [
+                    {
+                        "name": "indexTime",
+                        "init": { "expr": -666 },
+                        "streams": [{
+                            "type": "mousemove",
+                            "expr": "clamp(eventX(), 0, eventGroup('root').width)",
+                            "scale": { "name": "x", "invert": true }
+                        }]
+                    },
+                    {
+                        "name": "mouseY",
+                        "init": { "expr": -666 },
+                    },
+                ],
+
                 "scales": [
                     {
                         "name": "x",
                         "type": "time",
                         "nice": "hour",
                         "range": "width",
-                        // "round": true,
-                        "domain": {"data": "table", "field": "x"}
+                        "domain": { "data": "table", "field": "x" }
                     },
                     {
                         "name": "y",
                         "type": "linear",
                         "range": "height",
                         "nice": true,
-                        "domain": {"data": "table", "field": "y"}
+                        "domain": { "data": "table", "field": "y" }
                     },
                     {
                         "name": "y2",
                         "type": "linear",
                         "range": "height",
                         "nice": false,
-                        "domain": {"data": "dark", "field": "y"}
+                        "domain": { "data": "dark", "field": "y" }
                     }
                 ],
+
                 "axes": [
-                    {"type": "x", "scale": "x", "ticks": 24, "grid": true, "format": "%I"},
-                    {"type": "y", "scale": "y", "grid": true }
+                    { "type": "x", "scale": "x", "ticks": 24, "grid": true, "format": "%I" },
+                    { "type": "y", "scale": "y", "grid": true, }
                 ],
+                
                 "marks": [
                     {
                         "type": "area",
@@ -100,11 +139,11 @@ define([
                         },
                         "properties": {
                             "enter": {
-                                "interpolate": {"value": "linear"},
-                                "x": {"scale": "x", "field": "x"},
-                                "y": {"scale": "y", "field": "y"},
-                                "y2": {"scale": "y", "value": limit},
-                                "fill": {"value": below_color }
+                                // "interpolate": {"value": "linear"},
+                                "x": { "scale": "x", "field": "x" },
+                                "y": { "scale": "y", "field": "y" },
+                                "y2":  { "scale": "y", "value": limit },
+                                "fill": { "value": below_color }
                             }
                         }
                     },
@@ -112,11 +151,17 @@ define([
                         "type": "area",
                         "from": {
                             "data": "table",
-                            "transform": [{"type": "filter", "test": "datum.y >= " + limit }]
+                            "transform": [
+                                {
+                                    "type": "formula",
+                                    "field": "y",
+                                    "expr": "clamp(datum.y, " + limit + ", 666)"
+                                }
+                            ]
                         },
                         "properties": {
                             "enter": {
-                                "interpolate": {"value": "linear"},
+                                // "interpolate": {"value": "linear"},
                                 "x": { "scale": "x", "field": "x" },
                                 "y": { "scale": "y", "field": "y" },
                                 "y2": {"scale": "y", "value": limit },
@@ -132,14 +177,53 @@ define([
                                 "x": { "scale": "x", "field": "x" },
                                 "x2": { "scale": "x", "field": "x2" },
                                 "y": { "scale": "y2", "field": "y" },
-                                "y2": { "scale": "y2", "value": 0},
+                                "y2": { "scale": "y2", "value": 0 },
                                 "fill": { "value": "black" },
                                 "fillOpacity": { "value": 0.35 }
                             }
                         }
+                    },
+                    {
+                        "type": "rule",
+                        "properties": {
+                            "update": {
+                                "x": { "scale": "x", "signal": "indexTime" },
+                                "y": { "value": 0 },
+                                "y2": { "field": { "group": "height" } },
+                                "stroke": { "value": "#000" },
+                                "strokeWidth": { "value": 1 },
+                            }
+                        }
+                    },
+                    {
+                        "type":"rule",
+                        "properties": {
+                            "update": {
+                                "x": { "value": 0 },
+                                "x2": { "field": { "group": "width" } },
+                                "y": { "scale": "y", "signal": "mouseY" },
+                                "stroke": { "value": "#000" },
+                                "strokeWidth": { "value": 1 },
+                            }
+                        }
+                    },
+                    {
+                        "type": "symbol",
+                        "properties": {
+                            "enter": {
+                                "size": { "value": 20 },
+                                "shape": { "value": "circle" },
+                                // "size": 5,
+                                "x": { "scale": "x", "value": now },
+                                "y": { "scale": "y", "value": now_level },
+                                "stroke": { "value": "#333" },
+                                "strokeWidth": { "value": 2 },
+                                "fill": { "value": "#333" },
+                            }
+                        }
                     }
                 ]
-            }
+            };
 
             var el = $(this.selector)[0];
             
@@ -147,7 +231,12 @@ define([
             //    chart({ el: "#graph" }).update();
             //});
             vg.parse.spec(spec, function(error, chart) {
-                chart({ el: el }).update();
+                var view = chart({ el: el });
+                view.update();
+                view.on("mousemove", function(event, item) {
+                    view.signal("mouseY", lookup_x(pixels_to_x(event.layerX), d).y);
+                    view.update();
+                });
             });
         }
     });
