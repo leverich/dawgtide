@@ -34,7 +34,7 @@ function(
 
     new TideBox({ el: $(".boxes"), name: 'Haskins', time: time, tide_station: "9414392", tag: "Ha", limit: 3.25 });
     new TideBox({ el: $(".boxes"), name: '3rd Avenue', time: time, tide_station: "9414458", current_station: "sfb1305_7", tag: "3rd", limit: 2.0 });
-    new TideBox({ el: $(".boxes"), name: 'Palo Alto', time: time, tide_station: "9414575", current_station: "sfb1301_12", tag: "PA", limit: 4.0 });
+    new TideBox({ el: $(".boxes"), name: 'Palo Alto', time: time, tide_station: "9414575", current_station: "sfb1301_12", tag: "PA", limit: 2.4 });
     new TideBox({ el: $(".boxes"), name: 'Treasure Island', time: time, current_station: "sfb1210_13", tag: "TI", limit: 0.0 });
     new TideBox({ el: $(".boxes"), name: 'Golden Gate', time: time, current_station: "sfb1203_18", tag: "GG", limit: 0.0 });
     new TideBox({ el: $(".boxes"), name: 'Sherman Island', time: time, current_station: "sfb1332_15", tag: "&Delta;", box_id: "box_Delta", limit: 0.0 });
